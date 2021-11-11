@@ -10,109 +10,61 @@
 
   <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
 
-  <script src="https://cdn.jsdelivr.net/npm/algoliasearch@4.5.1/dist/algoliasearch-lite.umd.js" integrity="sha256-EXPXz4W6pQgfYY3yTpnDa3OH8/EPn16ciVsPQ/ypsjk=" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/instantsearch.js@4.8.3/dist/instantsearch.production.min.js" integrity="sha256-LAGhRRdtVoD6RLo2qDQsU2mp+XVSciKRC8XPOBWmofM=" crossorigin="anonymous"></script>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/instantsearch.css@7/themes/algolia-min.css">
-
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A==" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js" integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA==" crossorigin=""></script>
 
   <style>
-	  body {
-		  padding: 0;
-		  margin: 0;
-	  }
+	body {
+	  padding: 0;
+	  margin: 0;
+	}
 
-	  html,
-	  body,
-	  #mapid {
-		  height: 100%;
-		  width: 100%;
-	  }
-
-	  #searchbox {
-		  width: 100%;
-		  background: white;
-		  padding-top: 10px;
-		  padding-bottom: 5px;
-		  box-shadow: 0 0 7px 10px white;
-		  position: absolute;
-		  z-index: 999;
-	  }
-
-	  #searchbox form {
-		  width: 400px;
-		  margin: 0 auto;
-	  }
+	html,
+	body,
+	#mapid {
+	  height: 100%;
+	  width: 100%;
+	}
   </style>
 </head>
 
 <body>
-<div id="searchbox"></div>
-<div id="mapid"></div>
-<script>
-	const searchClient = algoliasearch('X7QAUD8DV0', '5a1c9e7eda2e5058506bf0809915fac7');
+  <div id="mapid"></div>
+  <script>
+	// generate map
+	var map = L.map('mapid').setView([45.596499, -62.639470], 3);
 
-	const search = instantsearch({
-		indexName: 'empls',
-		searchClient,
+	L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
+	  maxZoom: 18,
+	  minZoom: 1,
+	  attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
+		'<a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
+		'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+	  id: 'mapbox/streets-v11',
+	  tileSize: 512,
+	  zoomOffset: -1
+	}).addTo(map);
+
+	// get data from google sheet
+	// todo: scrape more data from Slack API
+	var url = "https://spreadsheets.google.com/feeds/list/1CpkBybyErktAROY6a2IJUNxywvIY5JSWb6aQiAQZc4M/od6/public/values?alt=json";
+	$.ajax({
+	  url: url,
+	  dataType: 'jsonp',
+	  success: function(data) {
+		var entry = data.feed.entry;
+
+		$(entry).each(function() {
+		  L.marker([parseFloat(this.gsx$longitude.$t), parseFloat(this.gsx$latitude.$t)]).addTo(map)
+			.bindPopup("<center><img src=\"" + this.gsx$photo.$t + "\" height=\"120px\" width=\"120px\" style=\"border-radius:50%\"/><br /><b>" + this.gsx$name.$t + "</b><br />" + this.gsx$title.$t + "</center>");
+		});
+	  }
 	});
 
-	var map = null;
-	var markers = [];
-
-	const renderGeoSearch = (renderOptions, isFirstRender) => {
-		const { items } = renderOptions;
-
-		if (isFirstRender) {
-			map = L.map('mapid').setView([45.596499, -62.639470], 3);
-
-			L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
-				maxZoom: 18,
-				minZoom: 1,
-				attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors, ' +
-					'<a href="https://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, ' +
-					'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-				id: 'mapbox/streets-v11',
-				tileSize: 512,
-				zoomOffset: -1
-			}).addTo(map);
-		}
-
-		markers.forEach(marker => marker.remove());
-
-		markers = items.map(({ name, title, photoURL, _geoloc }) =>
-			// L.marker([_geoloc.lat, _geoloc.lng]).addTo(map)
-			L.marker([_geoloc.lng, _geoloc.lat]).addTo(map)
-				.bindPopup("<center><img src=\"" + photoURL + "\" height=\"120px\" width=\"120px\" style=\"border-radius:50%\"/><br /><b>" + name + "</b><br />" + title + "</center>")
-		);
-
-		if (markers.length) {
-			map.fitBounds(L.featureGroup(markers).getBounds());
-		}
-	};
-
-	const customGeoSearch = instantsearch.connectors.connectGeoSearch(
-		renderGeoSearch
-	);
-
-	search.addWidgets([
-		instantsearch.widgets.searchBox({
-			container: '#searchbox',
-			placeholder: 'Search for employee name or title ...'
-		}),
-
-		customGeoSearch({
-			// instance params
-		}),
-
-		instantsearch.widgets.configure({
-			hitsPerPage: 300
-		}),
-	]);
-
-	search.start();
-</script>
+	L.marker([34.046550, -118.261930]).addTo(map)
+	  .bindPopup("<b>LA Office</b><br />888 S Figueroa St");
+  </script>
 </body>
 
 </html>
